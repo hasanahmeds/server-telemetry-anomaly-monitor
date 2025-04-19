@@ -1,0 +1,361 @@
+[
+  {
+    "timestamp": "2025-04-19T15:09:03+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 1/36",
+    "prefix_bytes": {
+      "upstream/LICENSE": 16724
+    }
+  },
+  {
+    "timestamp": "2025-04-19T18:42:10+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 2/36",
+    "prefix_bytes": {
+      "upstream/.github/workflows/pythonpublish.yml": 604,
+      "upstream/.isort.cfg": 112,
+      "upstream/.readthedocs.yml": 251,
+      "upstream/.travis.yml": 468,
+      "upstream/mypy.ini": 1043,
+      "upstream/pyproject.toml": 29,
+      "upstream/setup.cfg": 1484,
+      "upstream/setup.py": 38,
+      "upstream/tox.ini": 385,
+      "upstream/src/adtk/_utils.py": 1050,
+      "upstream/src/adtk/data/__init__.py": 310,
+      "upstream/src/adtk/data/_data.py": 3887
+    }
+  },
+  {
+    "timestamp": "2025-04-22T18:05:15+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 3/36",
+    "prefix_bytes": {
+      "upstream/src/adtk/data/_data.py": 25267
+    }
+  },
+  {
+    "timestamp": "2025-04-22T18:27:06+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 4/36",
+    "prefix_bytes": {
+      "upstream/src/adtk/data/_data.py": 27216,
+      "upstream/.coveragerc": 185,
+      "upstream/.gitattributes": 36,
+      "upstream/.gitignore": 1713,
+      "upstream/MANIFEST.in": 33,
+      "upstream/README.md": 2785,
+      "upstream/src/adtk/__init__.py": 836,
+      "upstream/src/adtk/_aggregator_base.py": 2919,
+      "upstream/src/adtk/_base.py": 4969
+    }
+  },
+  {
+    "timestamp": "2025-04-22T18:40:15+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 5/36",
+    "prefix_bytes": {
+      "upstream/src/adtk/_base.py": 11580,
+      "upstream/src/adtk/_detector_base.py": 14428
+    }
+  },
+  {
+    "timestamp": "2025-04-22T20:01:59+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 6/36",
+    "prefix_bytes": {
+      "upstream/src/adtk/_detector_base.py": 20169,
+      "upstream/src/adtk/_transformer_base.py": 4828,
+      "upstream/src/adtk/aggregator/__init__.py": 735,
+      "upstream/src/adtk/aggregator/_aggregator.py": 5168
+    }
+  },
+  {
+    "timestamp": "2025-04-23T13:39:06+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 7/36",
+    "prefix_bytes": {
+      "upstream/src/adtk/aggregator/_aggregator.py": 7509,
+      "upstream/src/adtk/detector/__init__.py": 1691,
+      "upstream/src/adtk/detector/_detector_1d.py": 14342
+    }
+  },
+  {
+    "timestamp": "2025-04-23T15:01:04+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 8/36",
+    "prefix_bytes": {
+      "upstream/src/adtk/detector/_detector_1d.py": 35241
+    }
+  },
+  {
+    "timestamp": "2025-04-23T17:20:08+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 9/36",
+    "prefix_bytes": {
+      "upstream/src/adtk/detector/_detector_1d.py": 39359,
+      "upstream/src/adtk/detector/_detector_hd.py": 13183
+    }
+  },
+  {
+    "timestamp": "2025-04-23T21:01:35+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 10/36",
+    "prefix_bytes": {
+      "upstream/src/adtk/metrics/__init__.py": 206,
+      "upstream/src/adtk/metrics/_metrics.py": 19000
+    }
+  },
+  {
+    "timestamp": "2025-04-24T13:31:56+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 11/36",
+    "prefix_bytes": {
+      "upstream/src/adtk/metrics/_metrics.py": 20134,
+      "upstream/src/adtk/pipe/__init__.py": 280,
+      "upstream/src/adtk/pipe/_pipe.py": 17611
+    }
+  },
+  {
+    "timestamp": "2025-04-24T15:45:55+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 12/36",
+    "prefix_bytes": {
+      "upstream/src/adtk/pipe/_pipe.py": 39858
+    }
+  },
+  {
+    "timestamp": "2025-04-24T19:17:29+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 13/36",
+    "prefix_bytes": {
+      "upstream/src/adtk/pipe/_pipe.py": 55595,
+      "upstream/src/adtk/transformer/__init__.py": 1707,
+      "upstream/src/adtk/transformer/_transformer_1d.py": 1270
+    }
+  },
+  {
+    "timestamp": "2025-04-25T18:51:03+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 14/36",
+    "prefix_bytes": {
+      "upstream/src/adtk/transformer/_transformer_1d.py": 23738
+    }
+  },
+  {
+    "timestamp": "2025-04-25T19:10:34+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 15/36",
+    "prefix_bytes": {
+      "upstream/src/adtk/transformer/_transformer_1d.py": 35766,
+      "upstream/src/adtk/transformer/_transformer_hd.py": 7957
+    }
+  },
+  {
+    "timestamp": "2025-04-26T19:15:48+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 16/36",
+    "prefix_bytes": {
+      "upstream/src/adtk/transformer/_transformer_hd.py": 10577,
+      "upstream/src/adtk/visualization/__init__.py": 85,
+      "upstream/src/adtk/visualization/_visualization.py": 14589
+    }
+  },
+  {
+    "timestamp": "2025-04-26T20:30:31+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 17/36",
+    "prefix_bytes": {
+      "upstream/src/adtk/visualization/_visualization.py": 22226,
+      "upstream/docs/.gitignore": 6,
+      "upstream/docs/_static/arundo_logo.png": 6200,
+      "upstream/docs/_static/arundo_logo_black.png": 9384,
+      "upstream/docs/api/aggregators.rst": 92,
+      "upstream/docs/api/data.rst": 80,
+      "upstream/docs/api/detectors.rst": 86,
+      "upstream/docs/api/metrics.rst": 86,
+      "upstream/docs/api/modules.rst": 197,
+      "upstream/docs/api/pipe.rst": 105
+    }
+  },
+  {
+    "timestamp": "2025-04-27T16:12:19+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 18/36",
+    "prefix_bytes": {
+      "upstream/docs/api/transformers.rst": 95,
+      "upstream/docs/api/visualization.rst": 100,
+      "upstream/docs/conf.py": 5635,
+      "upstream/docs/developer.rst": 7822,
+      "upstream/docs/examples.rst": 313,
+      "upstream/docs/images/cyclic.png": 102853,
+      "upstream/docs/images/level_shift.png": 70242,
+      "upstream/docs/images/level_shift_double_rolling.png": 102910,
+      "upstream/docs/images/local_spike.png": 44752,
+      "upstream/docs/images/missing_data.png": 30463,
+      "upstream/docs/images/non_zeros_count.png": 84725
+    }
+  },
+  {
+    "timestamp": "2025-04-27T20:24:08+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 19/36",
+    "prefix_bytes": {
+      "upstream/docs/images/quickstart0.png": 169382,
+      "upstream/docs/images/quickstart1.png": 171509,
+      "upstream/docs/images/quickstart2.png": 173805,
+      "upstream/docs/images/quickstart3.png": 79710,
+      "upstream/docs/images/restart.png": 52558,
+      "upstream/docs/images/seasonal.png": 103542,
+      "upstream/docs/images/spike.png": 58668,
+      "upstream/docs/images/split_1.png": 71941,
+      "upstream/docs/images/split_2.png": 99743,
+      "upstream/docs/images/split_3.png": 104614,
+      "upstream/docs/images/split_4.png": 122485,
+      "upstream/docs/images/volatility_shift_double_rolling.png": 121735,
+      "upstream/docs/index.rst": 1103,
+      "upstream/docs/inheritance.rst": 2736
+    }
+  },
+  {
+    "timestamp": "2025-04-28T12:04:16+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 20/36",
+    "prefix_bytes": {
+      "upstream/docs/install.rst": 468,
+      "upstream/docs/Makefile": 605,
+      "upstream/docs/notebooks/data/autoregression.csv": 19221,
+      "upstream/docs/notebooks/data/cpu.csv": 38474,
+      "upstream/docs/notebooks/data/gaussian2d.csv": 15030,
+      "upstream/docs/notebooks/data/generator.csv": 22653,
+      "upstream/docs/notebooks/data/invalid_series.csv": 218,
+      "upstream/docs/notebooks/data/pressure.csv": 7556,
+      "upstream/docs/notebooks/data/price_long.csv": 25791,
+      "upstream/docs/notebooks/data/price_short.csv": 5381,
+      "upstream/docs/notebooks/data/pricing.csv": 28062,
+      "upstream/docs/notebooks/data/quickstart/known_anomalies.csv": 198016,
+      "upstream/docs/notebooks/data/quickstart/testing.csv": 33934,
+      "upstream/docs/notebooks/data/quickstart/training.csv": 231854,
+      "upstream/docs/notebooks/data/seasonal+trend.csv": 1577
+    }
+  },
+  {
+    "timestamp": "2025-04-28T12:20:13+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 21/36",
+    "prefix_bytes": {
+      "upstream/docs/notebooks/data/seasonal.csv": 265768,
+      "upstream/docs/notebooks/data/seismic.csv": 43148,
+      "upstream/docs/notebooks/data/sin.csv": 61178,
+      "upstream/docs/notebooks/data/temperature.csv": 5202,
+      "upstream/docs/notebooks/demo.ipynb": 415608
+    }
+  },
+  {
+    "timestamp": "2025-04-28T13:13:33+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 22/36",
+    "prefix_bytes": {
+      "upstream/docs/notebooks/demo.ipynb": 1435084
+    }
+  },
+  {
+    "timestamp": "2025-04-28T13:42:15+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 23/36",
+    "prefix_bytes": {
+      "upstream/docs/notebooks/demo.ipynb": 2427392
+    }
+  },
+  {
+    "timestamp": "2025-04-28T21:39:15+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 24/36",
+    "prefix_bytes": {
+      "upstream/docs/notebooks/demo.ipynb": 2825606
+    }
+  },
+  {
+    "timestamp": "2025-04-29T19:22:18+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 25/36",
+    "prefix_bytes": {
+      "upstream/docs/notebooks/demo.ipynb": 2940342
+    }
+  },
+  {
+    "timestamp": "2025-05-01T16:08:46+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 26/36",
+    "prefix_bytes": {
+      "upstream/docs/notebooks/demo.ipynb": 3514112
+    }
+  },
+  {
+    "timestamp": "2025-05-01T18:52:06+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 27/36",
+    "prefix_bytes": {
+      "upstream/docs/notebooks/demo.ipynb": 4346188,
+      "upstream/docs/notebooks/quickstart.ipynb": 799010,
+      "upstream/docs/quickstart.rst": 5072,
+      "upstream/docs/README.md": 303,
+      "upstream/docs/releasehistory.rst": 5676,
+      "upstream/docs/requirements-docs.txt": 79,
+      "upstream/docs/userguide.rst": 11742,
+      "upstream/tests/test_aggregators.py": 1201
+    }
+  },
+  {
+    "timestamp": "2025-05-01T22:47:18+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 28/36",
+    "prefix_bytes": {
+      "upstream/tests/test_aggregators.py": 5769,
+      "upstream/tests/test_attribute.py": 3500,
+      "upstream/tests/test_data_validation.py": 4394,
+      "upstream/tests/test_detector1d.py": 4920
+    }
+  },
+  {
+    "timestamp": "2025-05-03T13:21:35+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 29/36",
+    "prefix_bytes": {
+      "upstream/tests/test_detector1d.py": 15473,
+      "upstream/tests/test_detectorhd.py": 7866
+    }
+  },
+  {
+    "timestamp": "2025-05-03T16:31:36+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 30/36",
+    "prefix_bytes": {
+      "upstream/tests/test_expand_events.py": 3982,
+      "upstream/tests/test_few_shot_fit.py": 1056,
+      "upstream/tests/test_few_shot_predict.py": 2764,
+      "upstream/tests/test_inconsistent_train_test.py": 1616,
+      "upstream/tests/test_label_list_convert.py": 3560
+    }
+  },
+  {
+    "timestamp": "2025-05-03T18:41:40+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 31/36",
+    "prefix_bytes": {
+      "upstream/tests/test_label_list_convert.py": 14770,
+      "upstream/tests/test_metric.py": 3901,
+      "upstream/tests/test_pipe.py": 2401
+    }
+  },
+  {
+    "timestamp": "2025-05-05T18:08:59+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 32/36",
+    "prefix_bytes": {
+      "upstream/tests/test_pipe.py": 20583
+    }
+  },
+  {
+    "timestamp": "2025-05-06T19:46:53+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 33/36",
+    "prefix_bytes": {
+      "upstream/tests/test_pipe.py": 21090,
+      "upstream/tests/test_print_subclasses.py": 323,
+      "upstream/tests/test_series_name.py": 8053,
+      "upstream/tests/test_train_test_split.py": 4028,
+      "upstream/tests/test_transformer1d.py": 1132
+    }
+  },
+  {
+    "timestamp": "2025-05-06T19:52:22+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 34/36",
+    "prefix_bytes": {
+      "upstream/tests/test_transformer1d.py": 19894
+    }
+  },
+  {
+    "timestamp": "2025-05-06T20:01:06+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 35/36",
+    "prefix_bytes": {
+      "upstream/tests/test_transformer1d.py": 21624,
+      "upstream/tests/test_transformerhd.py": 9462,
+      "upstream/tests/test_visualization.ipynb": 249414
+    }
+  },
+  {
+    "timestamp": "2025-05-06T21:51:56+00:00",
+    "message": "chore(import): reconstruct arundo/adtk slice 36/36",
+    "prefix_bytes": {
+      "upstream/tests/test_visualization.ipynb": 2261526
+    }
+  }
+]
