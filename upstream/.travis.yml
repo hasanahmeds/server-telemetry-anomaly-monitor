@@ -1,0 +1,29 @@
+sudo: false
+language: python
+python:
+    - "3.5.2"
+    - "3.6"
+    - "3.7"
+    - "3.8"
+
+install: pip install tox-travis
+
+script:
+    - tox
+
+after_success:
+    - pip install -e .[test,dev]
+    - pytest --cov=adtk --cov-config=.coveragerc
+    - coveralls
+    - black --check ./src/adtk
+    - black --check ./tests
+    - isort --check-only -rc ./src/adtk
+    - isort --check-only -rc ./tests
+
+branches:
+    only:
+    - master
+    - develop
+
+notifications:
+  email: false
