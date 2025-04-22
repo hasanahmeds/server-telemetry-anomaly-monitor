@@ -718,3 +718,65 @@ def split_train_test(
                     ts.iloc[
                         (fold_pos + round(fold_len * train_ratio)) : (
                             fold_pos + fold_len
+                        )
+                    ],
+                )
+            )
+            fold_pos = fold_pos + fold_len
+        splits.append(
+            (
+                ts.iloc[
+                    fold_pos : (
+                        fold_pos + round((len(ts) - fold_pos) * train_ratio)
+                    )
+                ],
+                ts.iloc[
+                    (fold_pos + round((len(ts) - fold_pos) * train_ratio)) :
+                ],
+            )
+        )
+    elif mode == 2:
+        for k_fold in range(n_splits - 1):
+            fold_len = round(len(ts) / n_splits) * (k_fold + 1)
+            splits.append(
+                (
+                    ts.iloc[: round(fold_len * train_ratio)],
+                    ts.iloc[round(fold_len * train_ratio) : fold_len],
+                )
+            )
+        splits.append(
+            (
+                ts.iloc[: round(len(ts) * train_ratio)],
+                ts.iloc[round(len(ts) * train_ratio) : len(ts)],
+            )
+        )
+    elif mode == 3:
+        fold_len = round(len(ts) / (n_splits + 1))
+        for k_fold in range(n_splits - 1):
+            splits.append(
+                (
+                    ts.iloc[: ((k_fold + 1) * fold_len)],
+                    ts.iloc[
+                        ((k_fold + 1) * fold_len) : ((k_fold + 2) * fold_len)
+                    ],
+                )
+            )
+        splits.append(
+            (
+                ts.iloc[: (n_splits * fold_len)],
+                ts.iloc[(n_splits * fold_len) :],
+            )
+        )
+    elif mode == 4:
+        fold_len = round(len(ts) / (n_splits + 1))
+        for k_fold in range(n_splits):
+            splits.append(
+                (
+                    ts.iloc[: ((k_fold + 1) * fold_len)],
+                    ts.iloc[((k_fold + 1) * fold_len) :],
+                )
+            )
+    else:
+        raise ValueError("Argument `mode` must be one of 1, 2, 3, and 4.")
+
+    return splits

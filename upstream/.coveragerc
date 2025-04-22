@@ -1,0 +1,11 @@
+[report]
+omit = src/adtk/visualization/*
+show_missing = True
+exclude_lines =
+    pragma: no cover
+    raise
+    warnings.warn
+    pass
+    @property
+    @overload
+    def plot_flowchart
