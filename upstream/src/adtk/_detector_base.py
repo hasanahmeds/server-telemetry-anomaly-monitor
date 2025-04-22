@@ -398,3 +398,184 @@ class _TrainableUnivariateDetector(_TrainableUnivariateModel):
 #             Scoring function to use. Must be one of "recall", "precision",
 #             "f1", and "iou". See module `metrics` for more information.
 #             Default: "recall"
+
+#         **kwargs
+#             Optional parameters for scoring function. See module `metrics` for
+#             more information.
+
+#         Returns
+#         -------
+#         float
+#             Score of detection result.
+
+#         """
+#         if scoring == "recall":
+#             scoring_func = recall  # type: Callable
+#         elif scoring == "precision":
+#             scoring_func = precision
+#         elif scoring == "f1":
+#             scoring_func = f1_score
+#         elif scoring == "iou":
+#             scoring_func = iou
+#         else:
+#             raise ValueError(
+#                 "Argument `scoring` must be one of 'recall', 'precision', "
+#                 "'f1' and 'iou'."
+#             )
+#         if isinstance(anomaly_true, pd.Series):
+#             return scoring_func(
+#                 y_true=anomaly_true,
+#                 y_pred=self.detect(df, return_list=False),
+#                 **kwargs
+#             )
+#         else:
+#             return scoring_func(
+#                 y_true=anomaly_true,
+#                 y_pred=self.detect(df, return_list=True),
+#                 **kwargs
+#             )
+
+
+class _TrainableMultivariateDetector(_TrainableMultivariateModel):
+    def fit(self, df: pd.DataFrame) -> None:
+        """Train the detector with given time series.
+
+        Parameters
+        ----------
+        df: pandas.DataFrame
+            Time series to be used to train the detector.
+
+        """
+        self._fit(df)
+
+    def predict(
+        self, df: pd.DataFrame, return_list: bool = False
+    ) -> Union[
+        pd.Series, List[Union[Tuple[pd.Timestamp, pd.Timestamp], pd.Timestamp]]
+    ]:
+        """Detect anomalies from given time series.
+
+        Parameters
+        ----------
+        df: pandas.DataFrame
+            Time series to detect anomalies from.
+
+        return_list: bool, optional
+            Whether to return a list of anomalous events, or a binary series
+            indicating normal/anomalous. Default: False.
+
+        Returns
+        -------
+        pandas.Series or list
+            Detected anomalies.
+
+            - If return_list=False, return a binary series;
+            - If return_list=True, return a list of events where an event is a
+              pandas Timestamp if it is instantaneous or a 2-tuple of pandas
+              Timestamps if it is a closed time interval.
+
+        """
+        detected = self._predict(df)
+        if return_list:
+            return to_events(detected)
+        else:
+            return detected
+
+    def fit_predict(
+        self, df: pd.DataFrame, return_list: bool = False
+    ) -> Union[
+        pd.Series, List[Union[Tuple[pd.Timestamp, pd.Timestamp], pd.Timestamp]]
+    ]:
+        """Train the detector and detect anomalies from the time series used
+        for training.
+
+        Parameters
+        ----------
+        df: pandas.DataFrame
+            Time series to be used for training and be detected for anomalies.
+
+        return_list: bool, optional
+            Whether to return a list of anomalous events, or a binary series
+            indicating normal/anomalous. Default: False.
+
+        Returns
+        -------
+        pandas.Series or list
+            Detected anomalies.
+
+            - If return_list=False, return a binary series;
+            - If return_list=True, return a list of events where an event is a
+              pandas Timestamp if it is instantaneous or a 2-tuple of pandas
+              Timestamps if it is a closed time interval.
+
+        """
+        self.fit(df)
+        return self.detect(df, return_list=return_list)
+
+    detect = predict
+    fit_detect = fit_predict
+
+    def score(
+        self,
+        df: pd.DataFrame,
+        anomaly_true: Union[pd.Series, List, Tuple],
+        scoring: str = "recall",
+        **kwargs: Any
+    ) -> float:
+        """Detect anomalies and score the results against true anomalies.
+
+        Parameters
+        ----------
+        df: pandas DataFrame
+            Time series to detect anomalies from.
+            If a DataFrame with k columns, k univariate detectors will be
+            applied to them independently.
+
+        anomaly_true: Series or list
+            True anomalies.
+
+            - If pandas Series, it is treated as a series of binary labels.
+            - If list, a list of events where an event is a pandas Timestamp if
+              it is instantaneous or a 2-tuple of pandas Timestamps if it is a
+              closed time interval.
+
+        scoring: str, optional
+            Scoring function to use. Must be one of "recall", "precision",
+            "f1", and "iou". See module `metrics` for more information.
+            Default: "recall"
+
+        **kwargs
+            Optional parameters for scoring function. See module `metrics` for
+            more information.
+
+        Returns
+        -------
+        float
+            Score of detection result.
+
+        """
+        if scoring == "recall":
+            scoring_func = recall  # type: Callable
+        elif scoring == "precision":
+            scoring_func = precision
+        elif scoring == "f1":
+            scoring_func = f1_score
+        elif scoring == "iou":
+            scoring_func = iou
+        else:
+            raise ValueError(
+                "Argument `scoring` must be one of 'recall', 'precision', "
+                "'f1' and 'iou'."
+            )
+        if isinstance(anomaly_true, pd.Series):
+            return scoring_func(
+                y_true=anomaly_true,
+                y_pred=self.detect(df, return_list=False),
+                **kwargs
+            )
+        else:
+            return scoring_func(
+                y_true=anomaly_true,
+                y_pred=self.detect(df, return_list=True),
+                **kwargs
+            )
