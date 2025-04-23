@@ -438,3 +438,603 @@ class PersistAD(_TrainableUnivariateDetector):
                     "input": "diff_abs",
                 },
                 "diff": {
+                    "model": DoubleRollingAggregate(
+                        agg=agg,
+                        window=(window, 1),
+                        center=True,
+                        min_periods=(min_periods, 1),
+                        diff="diff",
+                    ),
+                    "input": "original",
+                },
+                "sign_check": {
+                    "model": ThresholdAD(
+                        high=(
+                            0.0
+                            if side == "positive"
+                            else (
+                                float("inf")
+                                if side == "negative"
+                                else -float("inf")
+                            )
+                        ),
+                        low=(
+                            0.0
+                            if side == "negative"
+                            else (
+                                -float("inf")
+                                if side == "positive"
+                                else float("inf")
+                            )
+                        ),
+                    ),
+                    "input": "diff",
+                },
+                "and": {
+                    "model": AndAggregator(),
+                    "input": ["iqr_ad", "sign_check"],
+                },
+            }
+        )
+        super().__init__()
+        self.c = c
+        self.side = side
+        self.window = window
+        self.min_periods = min_periods
+        self.agg = agg
+        self._sync_params()
+
+    @property
+    def _param_names(self) -> Tuple[str, ...]:
+        return ("window", "c", "side", "min_periods", "agg")
+
+    def _sync_params(self) -> None:
+        if self.agg not in ["median", "mean"]:
+            raise ValueError(
+                "Parameter `agg` must be either 'median' or 'mean'."
+            )
+        if self.side not in ["both", "positive", "negative"]:
+            raise ValueError(
+                "Parameter `side` must be 'both', 'positive' or 'negative'."
+            )
+        self.pipe_.steps["diff_abs"]["model"].set_params(
+            agg=self.agg,
+            window=(self.window, 1),
+            min_periods=(self.min_periods, 1),
+        )
+        self.pipe_.steps["iqr_ad"]["model"].set_params(c=(None, self.c))
+        self.pipe_.steps["diff"]["model"].set_params(
+            agg=self.agg,
+            window=(self.window, 1),
+            min_periods=(self.min_periods, 1),
+        )
+        self.pipe_.steps["sign_check"]["model"].set_params(
+            high=(
+                0.0
+                if self.side == "positive"
+                else (
+                    float("inf") if self.side == "negative" else -float("inf")
+                )
+            ),
+            low=(
+                0.0
+                if self.side == "negative"
+                else (
+                    -float("inf") if self.side == "positive" else float("inf")
+                )
+            ),
+        )
+
+    def _fit_core(self, s: pd.Series) -> None:
+        self._sync_params()
+        self.pipe_.fit(s)
+
+    def _predict_core(self, s: pd.Series) -> pd.Series:
+        self._sync_params()
+        return self.pipe_.detect(s)
+
+
+class LevelShiftAD(_TrainableUnivariateDetector):
+    """Detector that detects level shift of time series values.
+
+    This detector compares values of two time windows next to each others, and
+    identifies the time point in between as an level-shift point if the
+    difference of the medians in the two time windows is anomalously large.
+
+    This detector is internally implemented as a `Pipenet` object. Advanced
+    users may learn more details by checking attribute `pipe_`.
+
+    Parameters
+    ----------
+    window: int or str, or 2-tuple of int or str
+        Size of the time windows.
+
+        - If int, it is the number of time point in this time window.
+        - If str, it must be able to be converted into a pandas Timedelta
+          object.
+        - If 2-tuple, it defines the left and right window respectively.
+
+    c: float, optional
+        Factor used to determine the bound of normal range based on historical
+        interquartile range. Default: 6.0.
+
+    side: str, optional
+        - If "both", to detect anomalous positive and negative changes;
+        - If "positive", to only detect anomalous positive changes;
+        - If "negative", to only detect anomalous negative changes.
+
+        Default: "both".
+
+    min_periods: int, or 2-tuple of int, optional
+        Minimum number of observations in each window required to have a value
+        for that window. If 2-tuple, it defines the left and right window
+        respectively. Default: None, i.e. all observations must have values.
+
+    Attributes
+    ----------
+    pipe_: adtk.pipe.Pipenet
+        Internal pipenet object.
+
+    """
+
+    def __init__(
+        self,
+        window: Union[
+            Union[int, str], Tuple[Union[int, str], Union[int, str]]
+        ],
+        c: float = 6.0,
+        side: str = "both",
+        min_periods: Union[
+            Optional[int], Tuple[Optional[int], Optional[int]]
+        ] = None,
+    ) -> None:
+        self.pipe_ = Pipenet(
+            {
+                "diff_abs": {
+                    "model": DoubleRollingAggregate(
+                        agg="median",
+                        window=window,
+                        center=True,
+                        min_periods=min_periods,
+                        diff="l1",
+                    ),
+                    "input": "original",
+                },
+                "iqr_ad": {
+                    "model": InterQuartileRangeAD((None, c)),
+                    "input": "diff_abs",
+                },
+                "diff": {
+                    "model": DoubleRollingAggregate(
+                        agg="median",
+                        window=window,
+                        center=True,
+                        min_periods=min_periods,
+                        diff="diff",
+                    ),
+                    "input": "original",
+                },
+                "sign_check": {
+                    "model": ThresholdAD(
+                        high=(
+                            0.0
+                            if side == "positive"
+                            else (
+                                float("inf")
+                                if side == "negative"
+                                else -float("inf")
+                            )
+                        ),
+                        low=(
+                            0.0
+                            if side == "negative"
+                            else (
+                                -float("inf")
+                                if side == "positive"
+                                else float("inf")
+                            )
+                        ),
+                    ),
+                    "input": "diff",
+                },
+                "and": {
+                    "model": AndAggregator(),
+                    "input": ["iqr_ad", "sign_check"],
+                },
+            }
+        )
+        super().__init__()
+        self.c = c
+        self.side = side
+        self.window = window
+        self.min_periods = min_periods
+        self._sync_params()
+
+    @property
+    def _param_names(self) -> Tuple[str, ...]:
+        return ("window", "c", "side", "min_periods")
+
+    def _sync_params(self) -> None:
+        if self.side not in ["both", "positive", "negative"]:
+            raise ValueError(
+                "Parameter `side` must be 'both', 'positive' or 'negative'."
+            )
+        self.pipe_.steps["diff_abs"]["model"].set_params(
+            window=self.window, min_periods=self.min_periods
+        )
+        self.pipe_.steps["iqr_ad"]["model"].set_params(c=(None, self.c))
+        self.pipe_.steps["diff"]["model"].set_params(
+            window=self.window, min_periods=self.min_periods
+        )
+        self.pipe_.steps["sign_check"]["model"].set_params(
+            high=(
+                0.0
+                if self.side == "positive"
+                else (
+                    float("inf") if self.side == "negative" else -float("inf")
+                )
+            ),
+            low=(
+                0.0
+                if self.side == "negative"
+                else (
+                    -float("inf") if self.side == "positive" else float("inf")
+                )
+            ),
+        )
+
+    def _fit_core(self, s: pd.Series) -> None:
+        self._sync_params()
+        self.pipe_.fit(s)
+
+    def _predict_core(self, s: pd.Series) -> pd.Series:
+        self._sync_params()
+        return self.pipe_.detect(s)
+
+
+class VolatilityShiftAD(_TrainableUnivariateDetector):
+    """Detector that detects shift of volatility in time series.
+
+    This detector compares volatility of two time windows next to each others,
+    and identifies the time point in between as a volatility-shift point if the
+    difference of the volatility measurement in the two time windows is
+    anomalously large.
+
+    This detector is internally implemented as a `Pipenet` object. Advanced
+    users may learn more details by checking attribute `pipe_`.
+
+    Parameters
+    ----------
+    window: int or str, or 2-tuple of int or str
+        Size of the time windows.
+
+        - If int, it is the number of time point in this time window.
+        - If str, it must be able to be converted into a pandas Timedelta
+          object.
+        - If 2-tuple, it defines the left and right window respectively.
+
+    c: float, optional
+        Factor used to determine the bound of normal range based on historical
+        interquartile range. Default: 6.0.
+
+    side: str, optional
+        - If "both", to detect anomalous positive and negative changes;
+        - If "positive", to only detect anomalous positive changes;
+        - If "negative", to only detect anomalous negative changes.
+
+        Default: "both".
+
+    min_periods: int, optional
+        Minimum number of observations in each window required to have a value
+        for that window. If 2-tuple, it defines the left and right window
+        respectively. Default: None, i.e. all observations must have values.
+
+    agg: str, optional
+        Measurement of volatility in a time window, one of "std" (standard
+        deviation), "iqr" (interquartile range), or "idr" (interdecile range).
+        Default: "std".
+
+    Attributes
+    ----------
+    pipe_: adtk.pipe.Pipenet
+        Internal pipenet object.
+
+    """
+
+    def __init__(
+        self,
+        window: Union[
+            Union[int, str], Tuple[Union[int, str], Union[int, str]]
+        ],
+        c: float = 6.0,
+        side: str = "both",
+        min_periods: Union[
+            Optional[int], Tuple[Optional[int], Optional[int]]
+        ] = None,
+        agg: str = "std",
+    ) -> None:
+        self.pipe_ = Pipenet(
+            {
+                "diff_abs": {
+                    "model": DoubleRollingAggregate(
+                        agg=agg,
+                        window=window,
+                        center=True,
+                        min_periods=min_periods,
+                        diff="abs_rel_diff",
+                    ),
+                    "input": "original",
+                },
+                "iqr_ad": {
+                    "model": InterQuartileRangeAD((None, c)),
+                    "input": "diff_abs",
+                },
+                "diff": {
+                    "model": DoubleRollingAggregate(
+                        agg=agg,
+                        window=window,
+                        center=True,
+                        min_periods=min_periods,
+                        diff="diff",
+                    ),
+                    "input": "original",
+                },
+                "sign_check": {
+                    "model": ThresholdAD(
+                        high=(
+                            0.0
+                            if side == "positive"
+                            else (
+                                float("inf")
+                                if side == "negative"
+                                else -float("inf")
+                            )
+                        ),
+                        low=(
+                            0.0
+                            if side == "negative"
+                            else (
+                                -float("inf")
+                                if side == "positive"
+                                else float("inf")
+                            )
+                        ),
+                    ),
+                    "input": "diff",
+                },
+                "and": {
+                    "model": AndAggregator(),
+                    "input": ["iqr_ad", "sign_check"],
+                },
+            }
+        )
+        super().__init__()
+        self.agg = agg
+        self.c = c
+        self.side = side
+        self.window = window
+        self.min_periods = min_periods
+        self._sync_params()
+
+    @property
+    def _param_names(self) -> Tuple[str, ...]:
+        return ("window", "c", "side", "min_periods", "agg")
+
+    def _sync_params(self) -> None:
+        if self.agg not in ["std", "iqr", "idr"]:
+            raise ValueError("Parameter `agg` must be 'std', 'iqr' or 'idr'.")
+        if self.side not in ["both", "positive", "negative"]:
+            raise ValueError(
+                "Parameter `side` must be 'both', 'positive' or 'negative'."
+            )
+        self.pipe_.steps["diff_abs"]["model"].set_params(
+            agg=self.agg, window=self.window, min_periods=self.min_periods
+        )
+        self.pipe_.steps["iqr_ad"]["model"].set_params(c=(None, self.c))
+        self.pipe_.steps["diff"]["model"].set_params(
+            agg=self.agg, window=self.window, min_periods=self.min_periods
+        )
+        self.pipe_.steps["sign_check"]["model"].set_params(
+            high=(
+                0.0
+                if self.side == "positive"
+                else (
+                    float("inf") if self.side == "negative" else -float("inf")
+                )
+            ),
+            low=(
+                0.0
+                if self.side == "negative"
+                else (
+                    -float("inf") if self.side == "positive" else float("inf")
+                )
+            ),
+        )
+
+    def _fit_core(self, s: pd.Series) -> None:
+        self._sync_params()
+        self.pipe_.fit(s)
+
+    def _predict_core(self, s: pd.Series) -> pd.Series:
+        self._sync_params()
+        return self.pipe_.detect(s)
+
+
+class AutoregressionAD(_TrainableUnivariateDetector):
+    """Detector that detects anomalous autoregression property in time series.
+
+    Many time series has autoregressive behavior. For example, in a linearly
+    autoregressive time series, current value is a linear combination of
+    serveral previous values. Violation of usual autoregressive behavior may
+    indicate anomaly.
+
+    The detector applies a regressor to learn autoregressive property of the
+    time series, and identifies a time point as anomalous when the residual of
+    autoregression is anomalously large.
+
+    This detector is internally implemented as a `Pipenet` object. Advanced
+    users may learn more details by checking attribute `pipe_`.
+
+    Parameters
+    ----------
+    n_steps: int, optional
+        Number of steps (previous values) to include in the model. Default: 1.
+
+    step_size: int, optional
+        Length of a step. For example, if n_steps=2, step_size=3, X_[t-3] and
+        X_[t-6] will be used to predict X_[t]. Default: 1.
+
+    regressor: object, optional
+        Regressor to be used. Same as a scikit-learn regressor, it should
+        minimally have `fit` and `predict` methods. If not given, a linear
+        regressor will be used.
+
+    c: float, optional
+        Factor used to determine the bound of normal range based on historical
+        interquartile range. Default: 3.0.
+
+    side: str, optional
+        - If "both", to detect anomalous positive and negative residuals;
+        - If "positive", to only detect anomalous positive residuals;
+        - If "negative", to only detect anomalous negative residuals.
+
+        Default: "both".
+
+    Attributes
+    ----------
+    pipe_: adtk.pipe.Pipenet
+        Internal pipenet object.
+
+    """
+
+    def __init__(
+        self,
+        n_steps: int = 1,
+        step_size: int = 1,
+        regressor: Optional[Any] = None,
+        c: float = 3.0,
+        side: str = "both",
+    ) -> None:
+        if regressor is None:
+            regressor = LinearRegression()
+        self.pipe_ = Pipenet(
+            {
+                "retrospetive": {
+                    "model": Retrospect(
+                        n_steps=n_steps + 1, step_size=step_size
+                    ),
+                    "input": "original",
+                },
+                "regression_residual": {
+                    "model": RegressionResidual(
+                        target="t-0", regressor=regressor
+                    ),
+                    "input": "retrospetive",
+                },
+                "abs_residual": {
+                    "model": CustomizedTransformer1D(transform_func=abs),
+                    "input": "regression_residual",
+                },
+                "iqr_ad": {
+                    "model": InterQuartileRangeAD((None, c)),
+                    "input": "abs_residual",
+                },
+                "sign_check": {
+                    "model": ThresholdAD(
+                        high=(
+                            0.0
+                            if side == "positive"
+                            else (
+                                float("inf")
+                                if side == "negative"
+                                else -float("inf")
+                            )
+                        ),
+                        low=(
+                            0.0
+                            if side == "negative"
+                            else (
+                                -float("inf")
+                                if side == "positive"
+                                else float("inf")
+                            )
+                        ),
+                    ),
+                    "input": "regression_residual",
+                },
+                "and": {
+                    "model": AndAggregator(),
+                    "input": ["iqr_ad", "sign_check"],
+                },
+            }
+        )
+        super().__init__()
+        self.n_steps = n_steps
+        self.step_size = step_size
+        self.regressor = regressor
+        self.c = c
+        self.side = side
+        self._sync_params()
+
+    @property
+    def _param_names(self) -> Tuple[str, ...]:
+        return ("n_steps", "step_size", "regressor", "c", "side")
+
+    def _sync_params(self) -> None:
+        if self.side not in ["both", "positive", "negative"]:
+            raise ValueError(
+                "Parameter `side` must be 'both', 'positive' or 'negative'."
+            )
+        if self.regressor is None:
+            self.regressor = LinearRegression()
+        self.pipe_.steps["retrospetive"]["model"].set_params(
+            n_steps=self.n_steps + 1, step_size=self.step_size
+        )
+        self.pipe_.steps["regression_residual"]["model"].set_params(
+            regressor=self.regressor
+        )
+        self.pipe_.steps["iqr_ad"]["model"].set_params(c=(None, self.c))
+        self.pipe_.steps["sign_check"]["model"].set_params(
+            high=(
+                0.0
+                if self.side == "positive"
+                else (
+                    float("inf") if self.side == "negative" else -float("inf")
+                )
+            ),
+            low=(
+                0.0
+                if self.side == "negative"
+                else (
+                    -float("inf") if self.side == "positive" else float("inf")
+                )
+            ),
+        )
+
+    def _fit_core(self, s: pd.Series) -> None:
+        self._sync_params()
+        self.pipe_.fit(s)
+
+    def _predict_core(self, s: pd.Series) -> pd.Series:
+        self._sync_params()
+        return self.pipe_.detect(s)
+
+
+class SeasonalAD(_TrainableUnivariateDetector):
+    """Detector that detects anomalous values away from seasonal pattern.
+
+    This detector uses a seasonal decomposition transformer to remove seasonal
+    pattern (as well as trend optional), and identifies a time point as
+    anomalous when the residual of seasonal decomposition is anomalously large.
+
+    This detector is internally implemented as a `Pipenet` object. Advanced
+    users may learn more details by checking attribute `pipe_`.
+
+    Parameters
+    ----------
+    freq: int, optional
+        Length of a seasonal cycle as the number of time points in a cycle. If
+        not specified, the model will try to determine it based on
+        autocorrelation of the training series. Default: None.
+
+    c: float, optional
