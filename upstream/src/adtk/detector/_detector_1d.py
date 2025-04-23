@@ -1038,3 +1038,127 @@ class SeasonalAD(_TrainableUnivariateDetector):
         autocorrelation of the training series. Default: None.
 
     c: float, optional
+        Factor used to determine the bound of normal range based on historical
+        interquartile range. Default: 3.0.
+
+    side: str, optional
+        - If "both", to detect anomalous positive and negative residuals;
+        - If "positive", to only detect anomalous positive residuals;
+        - If "negative", to only detect anomalous negative residuals.
+
+        Default: "both".
+
+    trend: bool, optional
+        Whether to extract trend during decomposition. Default: False.
+
+    Attributes
+    ----------
+    freq_: int
+        Length of seasonal cycle as the number of time points in a cycle. Equal
+        to parameter `freq` if it is specified. Otherwise, calculated based on
+        autocorrelation of the training series.
+
+    seasonal_: pandas.Series
+        Seasonal pattern extracted from training series.
+
+    pipe_: adtk.pipe.Pipenet
+        Internal pipenet object.
+
+    """
+
+    def __init__(
+        self,
+        freq: Optional[int] = None,
+        side: str = "both",
+        c: float = 3.0,
+        trend: bool = False,
+    ) -> None:
+        self.pipe_ = Pipenet(
+            {
+                "deseasonal_residual": {
+                    "model": (
+                        ClassicSeasonalDecomposition(freq=freq, trend=trend)
+                    ),
+                    "input": "original",
+                },
+                "abs_residual": {
+                    "model": CustomizedTransformer1D(transform_func=abs),
+                    "input": "deseasonal_residual",
+                },
+                "iqr_ad": {
+                    "model": InterQuartileRangeAD((None, c)),
+                    "input": "abs_residual",
+                },
+                "sign_check": {
+                    "model": ThresholdAD(
+                        high=(
+                            0.0
+                            if side == "positive"
+                            else (
+                                float("inf")
+                                if side == "negative"
+                                else -float("inf")
+                            )
+                        ),
+                        low=(
+                            0.0
+                            if side == "negative"
+                            else (
+                                -float("inf")
+                                if side == "positive"
+                                else float("inf")
+                            )
+                        ),
+                    ),
+                    "input": "deseasonal_residual",
+                },
+                "and": {
+                    "model": AndAggregator(),
+                    "input": ["iqr_ad", "sign_check"],
+                },
+            }
+        )
+        super().__init__()
+        self.freq = freq
+        self.side = side
+        self.c = c
+        self.trend = trend
+        self._sync_params()
+
+    @property
+    def _param_names(self) -> Tuple[str, ...]:
+        return ("freq", "side", "c", "trend")
+
+    def _sync_params(self) -> None:
+        self.pipe_.steps["deseasonal_residual"]["model"].set_params(
+            freq=self.freq, trend=self.trend
+        )
+        self.pipe_.steps["iqr_ad"]["model"].set_params(c=(None, self.c))
+        self.pipe_.steps["sign_check"]["model"].set_params(
+            high=(
+                0.0
+                if self.side == "positive"
+                else (
+                    float("inf") if self.side == "negative" else -float("inf")
+                )
+            ),
+            low=(
+                0.0
+                if self.side == "negative"
+                else (
+                    -float("inf") if self.side == "positive" else float("inf")
+                )
+            ),
+        )
+
+    def _fit_core(self, s: pd.Series) -> None:
+        self._sync_params()
+        self.pipe_.fit(s)
+        self.freq_ = self.pipe_.steps["deseasonal_residual"]["model"].freq_
+        self.seasonal_ = self.pipe_.steps["deseasonal_residual"][
+            "model"
+        ].seasonal_
+
+    def _predict_core(self, s: pd.Series) -> pd.Series:
+        self._sync_params()
+        return self.pipe_.detect(s)
