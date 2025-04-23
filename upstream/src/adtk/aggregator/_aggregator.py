@@ -158,3 +158,55 @@ class AndAggregator(_Aggregator):
                     for key, value in lists.items()
                 }
                 time_window_stats = {
+                    key: pd.Series(
+                        [0] * len(clean_predict)
+                        + [1] * 2 * len(clean_predict)
+                        + [0] * len(clean_predict),
+                        index=(
+                            [
+                                window[0] - pd.Timedelta("1ns")
+                                for window in clean_predict
+                            ]
+                            + [window[0] for window in clean_predict]
+                            + [window[1] for window in clean_predict]
+                            + [
+                                window[1] + pd.Timedelta("1ns")
+                                for window in clean_predict
+                            ]
+                        ),
+                        dtype=int,
+                    ).sort_index()
+                    for key, clean_predict in clean_lists.items()
+                }  # type: Union[Dict, pd.Series]
+                time_window_stats = {
+                    key: value[~value.index.duplicated()]
+                    for key, value in time_window_stats.items()
+                }
+                time_window_stats = (
+                    pd.concat(time_window_stats, axis=1, join="outer")
+                    .fillna(method="ffill")
+                    .fillna(method="bfill")
+                    .fillna(0)
+                )
+                time_window_stats = time_window_stats.all(axis=1)
+                status = 0
+                last_t = None
+                aggregated_predict = []
+                for t, v in time_window_stats.items():
+                    if (status == 0) and (v == 1):
+                        start = t
+                        status = 1
+                    if (status == 1) and (v == 0):
+                        end = last_t
+                        aggregated_predict.append((start, end))
+                        status = 0
+                    last_t = t
+                return validate_events(aggregated_predict)
+            else:  # a dict of pandas Series/DataFrame
+                return self._predict_core(
+                    pd.concat(lists, join="outer", axis=1)
+                )
+        else:  # pandas DataFrame
+            predicted = lists.all(axis=1)
+            predicted[predicted & lists.isna().any(axis=1)] = float("nan")
+            return predicted
