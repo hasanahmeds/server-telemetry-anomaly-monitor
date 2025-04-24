@@ -518,3 +518,563 @@ class Pipenet:
         Check the following issues and raise error if found
         - steps is not a list of dict
         - some step does not have required keys
+        - some step has invalid keys other than required and optional keys
+        - some step's `name` is not str
+        - some steps have duplicated name
+        - some step uses reserved name
+        - some step's `input` is not str or list of str
+        - some step's `input` is not a step name or "original"
+        - some step's `subset` (optional) is not a str ("all"),
+            or a list of (str ("all") or list of str)
+        - some step's `subset` does not have the same length as `input`
+        - aggregator has a `subset` field
+        - some step's `model` is not a valid ADTK model object
+        - upstream of a transformer or a detector must be a transformer
+        - upstream of aggregator must be a detector or an aggregator
+
+        Create a directed graph of model execution flowchart, when following
+        issues will be checked:
+        - some step cannot be reached
+        - more than one outlet steps found
+
+        """
+
+        # check if step is a dict
+        if not isinstance(self.steps, dict):
+            raise TypeError("`steps` must be a dict objects.")
+        if not all([isinstance(value, dict) for value in self.steps.values()]):
+            raise TypeError("Values of dict `steps` must be dict objects.")
+
+        # check if each step has valid keys
+        if not all(
+            [
+                {"model", "input"}
+                <= step.keys()
+                <= {"model", "input", "subset"}
+                for step in self.steps.values()
+            ]
+        ):
+            raise KeyError(
+                "Each step must be a dict object with keys `model`, `input`, "
+                "and `subset` (optional)."
+            )
+
+        # check if each step has valid name
+        if not all(
+            [isinstance(step_name, str) for step_name in self.steps.keys()]
+        ):
+            raise TypeError("Model name must be a string.")
+        if any([step_name == "original" for step_name in self.steps.keys()]):
+            raise ValueError(
+                "'original' is a reserved name for original time series input "
+                "and you may not use it as a model name."
+            )
+
+        # check if each step has valid input
+        def islistofstr(li: Any) -> bool:
+            if not isinstance(li, list):
+                return False
+            if not all([isinstance(x, str) for x in li]):
+                return False
+            return True
+
+        if not all(
+            [
+                isinstance(step["input"], str) or islistofstr(step["input"])
+                for step in self.steps.values()
+            ]
+        ):
+            raise TypeError(
+                "Field `input` must be a string or a list of strings."
+            )
+        name_set = set(self.steps.keys()).union({"original"})
+        for step in self.steps.values():
+            if (
+                isinstance(step["input"], str)
+                and (step["input"] not in name_set)
+            ) or (
+                isinstance(step["input"], list)
+                and (not set(step["input"]) <= name_set)
+            ):
+                raise ValueError(
+                    "Field `input` must be 'original' or name of a model."
+                )
+
+        # check if only one step is not used as input (so it is the output)
+        for step in self.steps.values():
+            if isinstance(step["input"], str):
+                name_set = name_set - {step["input"]}
+            else:
+                name_set = name_set - set(step["input"])
+        if len(name_set) > 1:
+            raise ValueError(
+                "Pipenet output is ambiguous: "
+                "found more than one steps with no downstream step: {}.".format(
+                    name_set
+                )
+            )
+
+        # check if each step has a valid subset, or has no subset (then we
+        # will add default one to it)
+        for step_name, step in self.steps.items():
+            if isinstance(step["input"], str):
+                if "subset" not in step.keys():
+                    pass
+                elif not (
+                    (
+                        isinstance(step["subset"], str)
+                        or islistofstr(step["subset"])
+                    )
+                ):
+                    raise TypeError(
+                        "Field `subset` at step '{}' is invalid.".format(
+                            step_name
+                        )
+                    )
+                elif isinstance(step["subset"], str) and (
+                    step["subset"] != "all"
+                ):
+                    raise ValueError(
+                        "A subset corresponding to an input source must be "
+                        "'all' or a list of strings (even if there is only "
+                        "one element)."
+                    )
+            else:
+                if "subset" not in step.keys():
+                    pass
+                elif isinstance(step["subset"], str):
+                    if step["subset"] == "all":
+                        pass
+                    else:
+                        raise ValueError(
+                            "Field `subset` at step '{}' is invalid.".format(
+                                step_name
+                            )
+                        )
+                elif isinstance(step["subset"], list):
+                    if len(step["input"]) != len(step["subset"]):
+                        raise ValueError(
+                            "Fields `input` and `subset` are inconsistent at "
+                            "step '{}'.".format(step_name)
+                        )
+                    for subset in step["subset"]:
+                        if not (
+                            (isinstance(subset, str) or islistofstr(subset))
+                        ):
+                            raise TypeError(
+                                "Field `subset` at step '{}' is invalid.".format(
+                                    step_name
+                                )
+                            )
+                        if isinstance(subset, str) and (subset != "all"):
+                            raise ValueError(
+                                "A subset corresponding to an input source "
+                                "must be 'all' or a list of strings (even if "
+                                "there is only one element)."
+                            )
+                else:
+                    raise TypeError(
+                        "Field `subset` at step '{}' is invalid.".format(
+                            step_name
+                        )
+                    )
+
+        # check if each step has valid model
+        if not all(
+            [isinstance(step["model"], _Model) for step in self.steps.values()]
+        ):
+            raise ValueError(
+                "Model must be a detector, transformer, or aggregator object."
+            )
+
+        # check:
+        # 1. upstream of transformer and detector must be transformer, or input
+        # 2. upstream of aggregator must be detector or aggregator
+        for step_name, step in self.steps.items():
+            if isinstance(step["model"], (_Detector, _Transformer)):
+                if isinstance(step["input"], str):
+                    if step["input"] == "original":
+                        pass
+                    elif not isinstance(
+                        self.steps[step["input"]]["model"], _Transformer
+                    ):
+                        raise TypeError(
+                            "Model in step '{}' cannot accept output from "
+                            "step '{}'.".format(step_name, step["input"])
+                        )
+                else:
+                    for input in step["input"]:
+                        if input == "original":
+                            pass
+                        elif not isinstance(
+                            self.steps[input]["model"], _Transformer
+                        ):
+                            raise TypeError(
+                                "Model in step '{}' cannot accept output from "
+                                "step '{}'.".format(step_name, input)
+                            )
+            elif isinstance(step["model"], _Aggregator):
+                if isinstance(step["input"], str):
+                    if (step["input"] == "original") or (
+                        not isinstance(
+                            self.steps[step["input"]]["model"],
+                            (_Detector, _Aggregator),
+                        )
+                    ):
+                        raise TypeError(
+                            "Model in step '{}' cannot accept output from "
+                            "step '{}'.".format(step_name, step["input"])
+                        )
+                else:
+                    for input in step["input"]:
+                        if (input == "original") or (
+                            not isinstance(
+                                self.steps[input]["model"],
+                                (_Detector, _Aggregator),
+                            )
+                        ):
+                            raise TypeError(
+                                "Model in step '{}' cannot accept output from "
+                                "step '{}'.".format(step_name, input)
+                            )
+
+        # sort out graph
+        done_step = OrderedDict({"original": (0, 0)})
+        counter = 0
+        while True:
+            counter += 1
+            sub_counter = 0
+            done_step_name_up_to_last_round = set(done_step.keys())
+            for step_name, step in self.steps.items():
+                if step_name in done_step_name_up_to_last_round:
+                    continue
+                if isinstance(step["input"], str):
+                    if step["input"] in done_step_name_up_to_last_round:
+                        done_step.update({step_name: (counter, sub_counter)})
+                        sub_counter += 1
+                else:
+                    if set(step["input"]) <= done_step_name_up_to_last_round:
+                        done_step.update({step_name: (counter, sub_counter)})
+                        sub_counter += 1
+            if len(done_step) == len(self.steps) + 1:
+                break
+            if sub_counter == 0:
+                raise ValueError(
+                    "The following step(s) cannot be reached: {}.".format(
+                        set(self.steps.keys()) - set(done_step.keys())
+                    )
+                )
+        self.steps_graph_ = done_step.copy()
+        self.final_step_ = list(self.steps_graph_.keys())[-1]
+
+    @staticmethod
+    def _get_input(
+        step: Dict[str, Any], results: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Given a step block and an intermediate results dict, get the input of
+        this step based on fields `input` and `subset`.
+        """
+        if isinstance(step["model"], (_Detector, _Transformer)):
+            if isinstance(step["input"], str):
+                if ("subset" not in step.keys()) or (step["subset"] == "all"):
+                    input = results[step["input"]]
+                else:
+                    if len(step["subset"]) == 1:
+                        input = results[step["input"]][step["subset"][0]]
+                    else:
+                        input = results[step["input"]][step["subset"]]
+            else:
+                if ("subset" not in step.keys()) or (step["subset"] == "all"):
+                    input = pd.concat(
+                        [results[input_name] for input_name in step["input"]],
+                        axis=1,
+                    )
+                else:
+                    input = pd.concat(
+                        [
+                            results[input_name]
+                            if subset == "all"
+                            else (
+                                results[input_name][subset[0]]
+                                if len(subset) == 1
+                                else results[input_name][subset]
+                            )
+                            for input_name, subset in zip(
+                                step["input"], step["subset"]
+                            )
+                        ],
+                        axis=1,
+                    )
+        elif isinstance(step["model"], _Aggregator):
+            if isinstance(step["input"], str):
+                input = {step["input"]: results[step["input"]]}
+            else:
+                input = {
+                    input_name: results[input_name]
+                    for input_name in step["input"]
+                }
+        return input
+
+    def fit(
+        self,
+        ts: Union[pd.Series, pd.DataFrame],
+        skip_fit: Optional[List[str]] = None,
+        return_intermediate: bool = False,
+    ) -> Optional[Dict[str, Optional[Union[pd.Series, pd.DataFrame]]]]:
+        """Train models in the pipenet.
+
+        Parameters
+        ----------
+        ts: pandas Series or DataFrame
+            Time series used to train models.
+
+        skip_fit: list, optional
+            Models to skip training. This could be used when pipenet contains
+            models that are already trained by the same time series, and re-
+            training would be time consuming. It must be a list of strings
+            where each element is a model name. Default: None.
+
+        return_intermediate: bool, optional
+            Whether to return intermediate results. Default: False.
+
+        Returns
+        -------
+        dict, optional
+            If return_intermediate=True, return intermediate results generated
+            during training as a dictionary where keys are step names. If a
+            step does not perform transformation or detection, the result of
+            that step will be None.
+
+        """
+        self._validate()
+
+        if skip_fit is None:
+            skip_fit = []
+        if not isinstance(skip_fit, list):
+            raise TypeError("Parameter `skip_fit` must be a list.")
+        if not set(skip_fit) <= set(self.steps.keys()):
+            raise ValueError("Name(s) in `skip_fit` is not valid model name.")
+
+        # determine the step needing fit and/or predict
+        need_fit = {
+            step_name: (
+                isinstance(step["model"], _TrainableModel)
+                & (step_name not in skip_fit)
+            )
+            for step_name, step in self.steps.items()
+        }
+        need_predict = {step_name: False for step_name in self.steps.keys()}
+        for step_name in list(self.steps_graph_.keys())[:0:-1]:
+            if need_fit[step_name] or need_predict[step_name]:
+                if isinstance(self.steps[step_name]["input"], str):
+                    input = self.steps[step_name]["input"]
+                    if input != "original":
+                        need_predict[input] = True
+                else:
+                    for input in self.steps[step_name]["input"]:
+                        if input != "original":
+                            need_predict[input] = True
+
+        # run fit or fit_predict
+        results = {"original": ts.copy()}
+        for step_name in list(self.steps_graph_.keys())[1:]:
+            step = self.steps[step_name]
+            if not (need_fit[step_name] or need_predict[step_name]):
+                results.update({step_name: None})
+                continue
+            input = self._get_input(step, results)
+            if need_fit[step_name] and (not need_predict[step_name]):
+                step["model"].fit(input)
+                results.update({step_name: None})
+            elif (not need_fit[step_name]) and need_predict[step_name]:
+                results.update({step_name: step["model"].predict(input)})
+            else:
+                results.update({step_name: step["model"].fit_predict(input)})
+
+        # return intermediate results
+        if return_intermediate:
+            return results
+        else:
+            return None
+
+    def _predict(
+        self,
+        ts: Union[pd.Series, pd.DataFrame],
+        fit: bool,
+        detect: bool,
+        skip_fit: Optional[List[str]],
+        return_intermediate: bool,
+        return_list: bool = False,
+    ) -> Union[
+        Union[
+            pd.Series,
+            pd.DataFrame,
+            List[Union[Tuple[pd.Timestamp, pd.Timestamp], pd.Timestamp]],
+            Dict[
+                str,
+                List[Union[Tuple[pd.Timestamp, pd.Timestamp], pd.Timestamp]],
+            ],
+        ],
+        Dict[
+            str,
+            Union[
+                pd.Series,
+                pd.DataFrame,
+                List[Union[Tuple[pd.Timestamp, pd.Timestamp], pd.Timestamp]],
+                Dict[
+                    str,
+                    List[
+                        Union[Tuple[pd.Timestamp, pd.Timestamp], pd.Timestamp]
+                    ],
+                ],
+            ],
+        ],
+    ]:
+        """
+        Private method for detect, transform, fit_detect, fit_transform
+
+        Parameters
+        ----------
+        fit: bool
+            Whether this call is for fit_detect/fit_transform or
+            detect/transform.
+
+        detect: bool
+            Whether this call is for detect/fit_detect or
+            transform/fit_transform.
+
+        Others:
+            Same as higher-level calls
+
+        Returns
+        -------
+            Same as higher-level calls
+
+        """
+        self._validate()
+
+        if skip_fit is None:
+            skip_fit = []
+        if not isinstance(skip_fit, list):
+            raise TypeError("Parameter `skip_fit` must be a list.")
+        if not set(skip_fit) <= set(self.steps.keys()):
+            raise ValueError("Name(s) in `skip_fit` is not valid model name.")
+
+        last_step_name = list(self.steps_graph_.keys())[-1]
+
+        if detect:
+            if isinstance(self.steps[last_step_name]["model"], _Transformer):
+                raise RuntimeError(
+                    "This seems a transformation pipenet, "
+                    "because model at the final step '{}' is a transformer. "
+                    "Please use method `{}transform` instead.".format(
+                        last_step_name, "fit_" if fit else ""
+                    )
+                )
+        else:
+            if isinstance(
+                self.steps[last_step_name]["model"], (_Detector, _Aggregator)
+            ):
+                raise RuntimeError(
+                    "This seems a detection pipenet, "
+                    "because model at the final step '{}' is "
+                    "either a detector or an aggregator. "
+                    "Please use method `{}detect` instead.".format(
+                        last_step_name, "fit_" if fit else ""
+                    )
+                )
+
+        results = {
+            "original": ts.copy()
+        }  # type: Dict[str,Union[pd.Series,pd.DataFrame,List[Union[Tuple[pd.Timestamp, pd.Timestamp], pd.Timestamp]], Dict[str, List[Union[Tuple[pd.Timestamp, pd.Timestamp], pd.Timestamp]]]]]
+        for step_name in list(self.steps_graph_.keys())[1:]:
+            step = self.steps[step_name]
+            input = self._get_input(step, results)
+            results.update(
+                {
+                    step_name: (
+                        (
+                            step["model"].fit_predict(
+                                input, return_list=return_list
+                            )
+                            if isinstance(
+                                step["model"],
+                                (
+                                    _TrainableUnivariateDetector,
+                                    _TrainableMultivariateDetector,
+                                ),
+                            )
+                            else step["model"].predict(
+                                input, return_list=return_list
+                            )
+                        )
+                        if isinstance(step["model"], _Detector)
+                        else (
+                            step["model"].fit_predict(input)
+                            if isinstance(
+                                step["model"],
+                                (
+                                    _TrainableUnivariateTransformer,
+                                    _TrainableMultivariateTransformer,
+                                ),
+                            )
+                            else step["model"].predict(input)
+                        )
+                    )
+                    if fit and (step_name not in skip_fit)
+                    else (
+                        step["model"].predict(input, return_list=return_list)
+                        if isinstance(step["model"], _Detector)
+                        else step["model"].predict(input)
+                    )
+                }
+            )
+
+        if return_intermediate:
+            return results
+        else:
+            return results[last_step_name]
+
+    def detect(
+        self,
+        ts: Union[pd.Series, pd.DataFrame],
+        return_intermediate: bool = False,
+        return_list: bool = False,
+    ) -> Union[
+        Union[
+            pd.Series,
+            pd.DataFrame,
+            List[Union[Tuple[pd.Timestamp, pd.Timestamp], pd.Timestamp]],
+            Dict[
+                str,
+                List[Union[Tuple[pd.Timestamp, pd.Timestamp], pd.Timestamp]],
+            ],
+        ],
+        Dict[
+            str,
+            Union[
+                pd.Series,
+                pd.DataFrame,
+                List[Union[Tuple[pd.Timestamp, pd.Timestamp], pd.Timestamp]],
+                Dict[
+                    str,
+                    List[
+                        Union[Tuple[pd.Timestamp, pd.Timestamp], pd.Timestamp]
+                    ],
+                ],
+            ],
+        ],
+    ]:
+        """Detect anomaly from time series using the pipenet.
+
+        Parameters
+        ----------
+        ts: pandas Series or DataFrame
+            Time series to detect anomalies from.
+
+        return_intermediate: bool, optional
+            Whether to return intermediate results. Default: False.
+
+        return_list: bool, optional
+            Whether to return a list of anomalous events, or a binary series
