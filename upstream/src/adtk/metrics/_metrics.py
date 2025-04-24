@@ -558,3 +558,32 @@ def iou(
             return float("nan")
     elif isinstance(y_true, pd.DataFrame) and isinstance(y_pred, pd.DataFrame):
         if set(y_true.columns) != set(y_pred.columns):
+            raise ValueError("y_true and y_pred must have identical columns.")
+        return {col: iou(y_true[col], y_pred[col]) for col in y_true.columns}
+    elif isinstance(y_true, list) and isinstance(y_pred, list):
+        y_int = AndAggregator().aggregate({"y_true": y_true, "y_pred": y_pred})
+        y_union = OrAggregator().aggregate(
+            {"y_true": y_true, "y_pred": y_pred}
+        )
+        len_int = sum(
+            [
+                (w[1] - w[0]).total_seconds() if isinstance(w, tuple) else 0
+                for w in y_int
+            ]
+        )
+        len_union = sum(
+            [
+                (w[1] - w[0]).total_seconds() if isinstance(w, tuple) else 0
+                for w in y_union
+            ]
+        )
+        if len_union == 0:
+            return float("nan")
+        return len_int / len_union
+    elif isinstance(y_true, dict) and isinstance(y_pred, dict):
+        return {key: iou(y_true[key], y_pred[key]) for key in y_true.keys()}
+    else:
+        raise TypeError(
+            "y_true and y_pred must be pandas Series or DataFrame, list, or a "
+            "dict of lists"
+        )
