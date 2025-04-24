@@ -1078,3 +1078,455 @@ class Pipenet:
 
         return_list: bool, optional
             Whether to return a list of anomalous events, or a binary series
+            indicating normal/anomalous. Default: False.
+
+        Returns
+        -------
+        pandas Series, pandas DataFrame, list, or dict
+            Detected anomalies.
+
+            - If return_intermediate=False, return detected anomalies, i.e.
+              result from last detector.
+            - If return_intermediate=True, return results of all models in
+              pipenet as a dict where each item represents the result of a
+              model.
+            - If return_list=False, result from a detector or an aggregator
+              will be a binary pandas Series indicating normal/anomalous.
+            - If return_list=True, result from a detector or an aggregator
+              will be a list of events where an event is a pandas Timestamp if
+              it is instantaneous or a 2-tuple of pandas Timestamps if it is a
+              closed time interval.
+
+        """
+        return self._predict(
+            ts,
+            fit=False,
+            detect=True,
+            skip_fit=None,
+            return_intermediate=return_intermediate,
+            return_list=return_list,
+        )
+
+    def transform(
+        self,
+        ts: Union[pd.Series, pd.DataFrame],
+        return_intermediate: bool = False,
+    ) -> Union[
+        Union[pd.Series, pd.DataFrame],
+        Dict[str, Union[pd.Series, pd.DataFrame]],
+    ]:
+        """Transform time series using the pipenet.
+
+        Parameters
+        ----------
+        ts: pandas Series or DataFrame
+            Time series to be transformed.
+
+        return_intermediate: bool, optional
+            Whether to return intermediate results. Default: False.
+
+        Returns
+        -------
+        pandas Series, pandas DataFrame, or dict
+            Transformed time series.
+
+            - If return_intermediate=False, return transformed series, i.e.
+              result from last transformer;
+            - If return_intermediate=True, return results of all models in
+              pipnet as a dict where each item represents the result of a
+              model.
+
+        """
+        return self._predict(
+            ts,
+            fit=False,
+            detect=False,
+            skip_fit=None,
+            return_intermediate=return_intermediate,
+        )
+
+    def fit_detect(
+        self,
+        ts: Union[pd.Series, pd.DataFrame],
+        skip_fit: Optional[List[str]] = None,
+        return_intermediate: bool = False,
+        return_list: bool = False,
+    ) -> Union[
+        Union[
+            pd.Series,
+            pd.DataFrame,
+            List[Union[Tuple[pd.Timestamp, pd.Timestamp], pd.Timestamp]],
+            Dict[
+                str,
+                List[Union[Tuple[pd.Timestamp, pd.Timestamp], pd.Timestamp]],
+            ],
+        ],
+        Dict[
+            str,
+            Union[
+                pd.Series,
+                pd.DataFrame,
+                List[Union[Tuple[pd.Timestamp, pd.Timestamp], pd.Timestamp]],
+                Dict[
+                    str,
+                    List[
+                        Union[Tuple[pd.Timestamp, pd.Timestamp], pd.Timestamp]
+                    ],
+                ],
+            ],
+        ],
+    ]:
+        """Train models in the pipenet and detect anomaly with it.
+
+        Parameters
+        ----------
+        ts: pandas Series or DataFrame
+            Time series to detect anomalies from.
+
+        skip_fit: list, optional
+            Models to skip training. This could be used when pipenet contains
+            models that are already trained by the same time series, and re-
+            training would be time consuming. It must be a list of strings
+            where each element is a model name. Default: None.
+
+        return_intermediate: bool, optional
+            Whether to return intermediate results. Default: False.
+
+        return_list: bool, optional
+            Whether to return a list of anomalous events, or a binary series
+            indicating normal/anomalous. Default: False.
+
+        Returns
+        -------
+        pandas Series, pandas DataFrame, list, or dict
+            Detected anomalies.
+
+            - If return_intermediate=False, return detected anomalies, i.e.
+              result from last detector.
+            - If return_intermediate=True, return results of all models in
+              pipenet as a dict where each item represents the result of a
+              model.
+            - If return_list=False, result from a detector or an aggregator
+              will be a binary pandas Series indicating normal/anomalous.
+            - If return_list=True, result from a detector or an aggregator
+              will be a list of events where an event is a pandas Timestamp if
+              it is instantaneous or a 2-tuple of pandas Timestamps if it is a
+              closed time interval.
+
+        """
+        return self._predict(
+            ts,
+            fit=True,
+            detect=True,
+            skip_fit=skip_fit,
+            return_intermediate=return_intermediate,
+            return_list=return_list,
+        )
+
+    def fit_transform(
+        self,
+        ts: Union[pd.Series, pd.DataFrame],
+        skip_fit: Optional[List[str]] = None,
+        return_intermediate: bool = False,
+    ) -> Union[
+        Union[pd.Series, pd.DataFrame],
+        Dict[str, Union[pd.Series, pd.DataFrame]],
+    ]:
+        """Train models in the pipenet and transform time series with it.
+
+        Parameters
+        ----------
+        ts: pandas Series or DataFrame
+            Time series to be transformed.
+
+        skip_fit: list, optional
+            Models to skip training. This could be used when pipenet contains
+            models that are already trained by the same time series, and re-
+            training would be time consuming. It must be a list of strings
+            where each element is a model name. Default: None.
+
+        return_intermediate: bool, optional
+            Whether to return intermediate results. Default: False.
+
+        Returns
+        -------
+        pandas Series, pandas DataFrame, or dict
+            Transformed time series.
+
+            - If return_intermediate=False, return transformed series, i.e.
+              result from last transformer;
+            - If return_intermediate=True, return results of all models in
+              pipenet as a dict where each item represents the result of a
+              model.
+
+
+        """
+        return self._predict(
+            ts,
+            fit=True,
+            detect=False,
+            skip_fit=skip_fit,
+            return_intermediate=return_intermediate,
+        )
+
+    def score(
+        self,
+        ts: Union[pd.Series, pd.DataFrame],
+        anomaly_true: Union[
+            pd.Series,
+            pd.DataFrame,
+            List[Union[Tuple[pd.Timestamp, pd.Timestamp], pd.Timestamp]],
+            Dict[
+                str,
+                List[Union[Tuple[pd.Timestamp, pd.Timestamp], pd.Timestamp]],
+            ],
+        ],
+        scoring: str = "recall",
+        **kwargs: Any
+    ) -> Union[float, Dict[str, float]]:
+        """Detect anomalies and score the results against true anomalies.
+
+        Parameters
+        ----------
+        ts: pandas Series or DataFrame
+            Time series to detect anomalies from.
+
+        anomaly_true: Series, or a list of Timestamps or Timestamp tuple
+            True anomalies.
+
+            - If pandas Series, it is treated as a series of binary labels.
+            - If list, a list of events where an event is a pandas Timestamp if
+              it is instantaneous or a 2-tuple of pandas Timestamps if it is a
+              closed time interval.
+
+        scoring: str, optional
+            Scoring function to use. Must be one of "recall", "precision",
+            "f1", and "iou". See module `metrics` for more information.
+            Default: "recall"
+
+        **kwargs
+            Optional parameters for scoring function. See module `metrics` for
+            more information.
+
+        Returns
+        -------
+        float
+            Score of detection result.
+
+        """
+        if scoring == "recall":
+            scoring_func = recall  # type: Callable
+        elif scoring == "precision":
+            scoring_func = precision
+        elif scoring == "f1":
+            scoring_func = f1_score
+        elif scoring == "iou":
+            scoring_func = iou
+        else:
+            raise ValueError(
+                "Argument `scoring` must be one of 'recall', 'precision', "
+                "'f1' and 'iou'."
+            )
+        if isinstance(anomaly_true, pd.Series):
+            return scoring_func(
+                y_true=anomaly_true,
+                y_pred=self.detect(ts, return_list=False),
+                **kwargs
+            )
+        else:
+            return scoring_func(
+                y_true=anomaly_true,
+                y_pred=self.detect(ts, return_list=True),
+                **kwargs
+            )
+
+    def get_params(self) -> Dict[str, Dict[str, Any]]:
+        """Get parameters of models in pipenet.
+
+        Returns
+        -------
+        dict
+            A dictionary of model name and model parameters.
+
+        """
+        return {
+            step_name: step["model"].get_params()
+            for step_name, step in self.steps.items()
+        }
+
+    def summary(self) -> None:
+        """Print a summary of the pipenet."""
+        df = pd.DataFrame(columns=["name", "model", "input", "subset"])
+        for step_name in self.steps_graph_.keys():
+            if step_name == "original":
+                continue
+            df = df.append(
+                {
+                    "name": step_name,
+                    "model": self.steps[step_name]["model"].__class__.__name__,
+                    "input": self.steps[step_name]["input"],
+                    "subset": (
+                        self.steps[step_name]["subset"]
+                        if "subset" in self.steps[step_name].keys()
+                        else "all"
+                    ),
+                },
+                ignore_index=True,
+            )
+        print(tabulate(df, headers="keys", tablefmt="simple", showindex=False))
+
+    def plot_flowchart(
+        self,
+        ax: Optional[plt.Axes] = None,
+        figsize: Optional[Tuple[float, float]] = None,
+        radius: float = 1.0,
+    ) -> plt.Axes:  # pragma: no cover
+        """Plot flowchart of this pipenet.
+
+        Parameters
+        ----------
+        ax: matplotlib axes object, optional
+            Axes to plot at. If not given, the method will create a matplotlib
+            figure and axes. Default: None.
+
+        figsize: tuple, optional
+            Width and height of the figure to plot at. Only to be used if `ax`
+            is not given. Default: None.
+
+        radius: float, optional
+            Relative size of components in the chart. Default: 1.0.
+
+        Returns
+        -------
+        matplotlib axes object
+            Axes where the flowchart is plotted.
+
+        """
+        self._validate()
+
+        radius = radius * 0.1
+
+        # create empty plot
+        if (ax is None) and (figsize is None):
+            figsize = (14, 16)
+        if ax is None:
+            _, ax = plt.subplots(figsize=figsize)
+
+        # get coordinate of components
+        layers = []  # type: List
+        for graph_step, values in self.steps_graph_.items():
+            if values[1] == 0:
+                layers.append([])
+            layers[-1].append(graph_step)
+        n_layer = len(layers)
+        max_n_comp = 0
+        coord = dict()
+        for layer in layers:
+            n_comp = len(layer)
+            max_n_comp = max(max_n_comp, n_comp)
+            for comp in layer:
+                x = self.steps_graph_[comp][0]
+                y = self.steps_graph_[comp][1] - (n_comp - 1) / 2
+                coord[comp] = (x, y)
+
+        # plot connection lines, and gather patches
+        io_patches = []  # type: List
+        detector_patches = []  # type: List
+        transformer_patches = []  # type: List
+        aggregator_patches = []  # type: List
+        for step_name, step in self.steps.items():
+            end_coord = coord[step_name]
+            if isinstance(step["model"], _Detector):
+                detector_patches.append(Circle(xy=end_coord, radius=radius))
+            elif isinstance(step["model"], _Transformer):
+                transformer_patches.append(Circle(xy=end_coord, radius=radius))
+            elif isinstance(step["model"], _Aggregator):
+                aggregator_patches.append(Circle(xy=end_coord, radius=radius))
+            if isinstance(step["input"], str):
+                input = step["input"]
+                start_coord = coord[input]
+                if ("subset" not in step.keys()) or (step["subset"] == "all"):
+                    linestyle = "-"
+                else:
+                    linestyle = "--"
+                plt.plot(
+                    [start_coord[0], end_coord[0]],
+                    [start_coord[1], end_coord[1]],
+                    color="k",
+                    linestyle=linestyle,
+                    zorder=1,
+                )
+            else:
+                for counter, input in enumerate(step["input"]):
+                    start_coord = coord[input]
+                    if (
+                        ("subset" not in step.keys())
+                        or (step["subset"] == "all")
+                        or (step["subset"][counter] == "all")
+                    ):
+                        linestyle = "-"
+                    else:
+                        linestyle = "--"
+                    plt.plot(
+                        [start_coord[0], end_coord[0]],
+                        [start_coord[1], end_coord[1]],
+                        color="k",
+                        linestyle=linestyle,
+                        zorder=1,
+                    )
+        plt.plot([n_layer - 1, n_layer], [0, 0], color="k", zorder=1)
+        io_patches.append(Circle(xy=(0, 0), radius=radius))
+        io_patches.append(Circle(xy=(n_layer, 0), radius=radius))
+
+        # draw components
+        ax.add_collection(PatchCollection(io_patches, zorder=2, color="y"))
+        ax.add_collection(
+            PatchCollection(detector_patches, zorder=2, color="g")
+        )
+        ax.add_collection(
+            PatchCollection(transformer_patches, zorder=2, color="c")
+        )
+        ax.add_collection(
+            PatchCollection(aggregator_patches, zorder=2, color="m")
+        )
+
+        # label components with step names
+        for key, value in coord.items():
+            ax.annotate(
+                key, (value[0] - radius, value[1]), zorder=3, color="k"
+            )
+        ax.annotate("result", (n_layer - radius, 0), zorder=3, color="k")
+
+        # add legend
+        plt.legend(
+            handles=[
+                Line2D([], [], color="k", label="full connection"),
+                Line2D(
+                    [],
+                    [],
+                    color="k",
+                    linestyle="--",
+                    label="partial connection",
+                ),
+                Circle([], radius=radius, color="y", label="input/output"),
+                Circle([], radius=radius, color="g", label="detector"),
+                Circle([], radius=radius, color="c", label="transformer"),
+                Circle([], radius=radius, color="m", label="aggregator"),
+            ],
+            bbox_to_anchor=(1, 1),
+            loc=2,
+            borderaxespad=0.0,
+        )
+
+        # clean up axes
+        ax.set_xlim([-radius - 0.1, n_layer + radius + 0.1])
+        ax.set_ylim(
+            [
+                -(max_n_comp - 1) / 2 - radius - 0.1,
+                (max_n_comp - 1) / 2 + radius + 0.1,
+            ]
+        )
+        ax.set_axis_off()
+        ax.set_aspect(1)
+
+        return ax
