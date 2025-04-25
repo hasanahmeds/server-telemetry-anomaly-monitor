@@ -638,3 +638,328 @@ class ClassicSeasonalDecomposition(_TrainableUnivariateTransformer):
     taking average over seasonal periods of the detrended series, and returns
     residual series.
 
+    The `fit` method fits seasonal frequency (if not specified) and seasonal
+    pattern with the training series. The `transform` (or its alias `predict`)
+    method extracts the trend by moving average, but will NOT re-calucate the
+    seasonal pattern. Instead, it uses the trained seasonal pattern and
+    extracts it from the detrended series to obtain the residual series. This
+    implicitly assumes the seasonal property does not change over time.
+
+    Parameters
+    ----------
+    freq: int, optional
+        Length of a seasonal cycle as the number of time points in a cycle. If
+        None, the model will determine based on autocorrelation of the training
+        series. Default: None.
+
+    trend: bool, optional
+        Whether to extract and remove trend of the series with moving average.
+        If False, the time series will be assumed the sum of seasonal pattern
+        and residual. Default: False.
+
+    Attributes
+    ----------
+    freq_: int
+        Length of seasonal cycle. Equal to parameter `freq` if it is given.
+        Otherwise, calculated based on autocorrelation of the training series.
+
+    seasonal_: pandas.Series
+        Seasonal pattern extracted from training series.
+
+    """
+
+    def __init__(
+        self, freq: Optional[int] = None, trend: bool = False
+    ) -> None:
+        super().__init__()
+        self.freq = freq
+        self.trend = trend
+
+    @property
+    def _param_names(self) -> Tuple[str, ...]:
+        return ("freq", "trend")
+
+    def _fit_core(self, s: pd.Series) -> None:
+        if not (
+            s.index.is_monotonic_increasing or s.index.is_monotonic_decreasing
+        ):
+            raise ValueError("Time series must have a monotonic time index. ")
+        # remove starting and ending nans
+        s = s.loc[s.first_valid_index() : s[::-1].first_valid_index()].copy()
+        if pd.isna(s).any():
+            raise ValueError(
+                "Found NaN in time series among valid values. "
+                "NaNs starting or ending a time series are allowed, "
+                "but those among valid values are not."
+            )
+        # get datum time
+        self._datumTimestamp = s.index[0]
+        # get series_freq
+        if s.index.freq is not None:
+            self._series_freq = s.index.freqstr
+        else:
+            self._series_freq = s.index.inferred_freq
+        if self._series_freq is None:
+            raise RuntimeError(
+                "Series does not follow any known frequency "
+                "(e.g. second, minute, hour, day, week, month, year, etc."
+            )
+        # get average dT
+        self._dT = pd.Series(s.index).diff().mean()
+        # get seasonal freq
+        if self.freq is None:
+            identified_freq = _identify_seasonal_period(s)
+            if identified_freq is None:
+                raise Exception("Could not find significant seasonality.")
+            else:
+                self.freq_ = identified_freq
+        else:
+            self.freq_ = self.freq
+        # get seasonal pattern
+        if self.trend:
+            seasonal_decompose_results = (
+                seasonal_decompose(s, period=self.freq_)
+                if parse(statsmodels.__version__) >= parse("0.11")
+                else seasonal_decompose(s, freq=self.freq_)
+            )
+            self.seasonal_ = getattr(seasonal_decompose_results, "seasonal")[
+                : self.freq_
+            ]
+        else:
+            self.seasonal_ = s.iloc[: self.freq_].copy()
+            for i in range(len(self.seasonal_)):
+                self.seasonal_.iloc[i] = s.iloc[
+                    i :: len(self.seasonal_)
+                ].mean()
+
+    def _predict_core(self, s: pd.Series) -> pd.Series:
+        if not (
+            s.index.is_monotonic_increasing or s.index.is_monotonic_decreasing
+        ):
+            raise ValueError("Time series must have a monotonic time index. ")
+        # check if series freq is same
+        if self._series_freq not in {s.index.freqstr, s.index.inferred_freq}:
+            raise RuntimeError(
+                "Model was trained by a series whose index has {} frequency, "
+                "but is tranforming a series whose index has {} frequency.".format(
+                    self._series_freq, s.index.freq
+                )
+            )
+        # get phase shift
+        approx_steps = (s.index[0] - self._datumTimestamp) / self._dT
+        # try to find starting_phase
+        if approx_steps > 0:
+            helper_index = pd.date_range(
+                start=self._datumTimestamp,
+                periods=round(approx_steps) + 100,
+                freq=self._series_freq,
+            )
+            if helper_index[-1] <= s.index[0]:
+                raise RuntimeError("You shouldn't have reached here...")
+            for i in range(len(helper_index) - 1, -1, -1):
+                if helper_index[i] == s.index[0]:
+                    starting_phase = i % self.freq_
+                    break
+                elif helper_index[i] < s.index[0]:
+                    raise RuntimeError(
+                        "The series to be transformed has different "
+                        "phases from the series used to train the model."
+                    )
+                else:
+                    pass
+            else:
+                raise RuntimeError(
+                    "You definitely shouldn't have reached here..."
+                )
+        elif approx_steps < 0:
+            helper_index = pd.date_range(
+                end=self._datumTimestamp,
+                periods=round(-approx_steps) + 100,
+                freq=self._series_freq,
+            )
+            if helper_index[0] >= s.index[0]:
+                raise RuntimeError("You shouldn't have reached here...")
+            for i in range(len(helper_index)):
+                if helper_index[i] == s.index[0]:
+                    starting_phase = (len(helper_index) - 1 - i) % self.freq_
+                    if starting_phase != 0:
+                        starting_phase = self.freq_ - starting_phase
+                    break
+                elif helper_index[i] > s.index[0]:
+                    raise RuntimeError(
+                        "The series to be transformed has different "
+                        "phases from the series used to train the model."
+                    )
+                else:
+                    pass
+            else:
+                raise RuntimeError(
+                    "You definitely shouldn't have reached here..."
+                )
+        else:
+            starting_phase = 0
+        # remove trend
+        if self.trend:
+            seasonal_decompose_results = (
+                seasonal_decompose(s, period=self.freq_)
+                if parse(statsmodels.__version__) >= parse("0.11")
+                else seasonal_decompose(s, freq=self.freq_)
+            )
+            s_trend = getattr(seasonal_decompose_results, "trend")
+            s_detrended = s - s_trend
+        # get seasonal series and remove it from original
+        phase_pattern = np.concatenate(
+            [np.arange(starting_phase, self.freq_), np.arange(starting_phase)]
+        )
+        s_seasonal = pd.Series(
+            self.seasonal_.values[
+                phase_pattern[np.arange(len(s)) % self.freq_]
+            ],
+            index=s.index,
+        )
+        if self.trend:
+            s_residual = s_detrended - s_seasonal
+        else:
+            s_residual = s - s_seasonal
+        return s_residual
+
+
+def _identify_seasonal_period(
+    s: pd.Series, low_autocorr: float = 0.1, high_autocorr: float = 0.3
+) -> Optional[int]:
+    """Identify seasonal period of a time series based on autocorrelation.
+
+    Parameters
+    ----------
+    s: pandas Series or DataFrame
+        Time series where to identify seasonal periods.
+
+    low_autocorr: float, optional
+        Threshold below which values of autocorreltion are consider low.
+        Default: 0.1
+
+    high_autocorr: float, optional
+        Threshold below which values of autocorreltion are consider high.
+        Default: 0.3
+
+    Returns
+    -------
+    int
+        Seasonal period of the time series. If no significant seasonality
+        is found, return None.
+
+    """
+
+    if low_autocorr > high_autocorr:
+        raise ValueError("`low_autocorr` must not exceed `high_autocorr`")
+
+    # check if the time series has uniform time step
+    if len(np.unique(np.diff(s.index))) > 1:
+        raise ValueError("The time steps are not constant. ")
+
+    autocorr = acf(s, nlags=len(s), fft=False)
+    cutPos = np.argwhere(autocorr >= low_autocorr)[0][0]
+    diff_autocorr = np.diff(autocorr[cutPos:])
+    high_autocorr_peak_pos = (
+        cutPos
+        + 1
+        + np.argwhere(
+            (diff_autocorr[:-1] > 0)
+            & (diff_autocorr[1:] < 0)
+            & (autocorr[cutPos + 1 : -1] > high_autocorr)
+        ).flatten()
+    )
+    if len(high_autocorr_peak_pos) > 0:
+        return high_autocorr_peak_pos[
+            np.argmax(autocorr[high_autocorr_peak_pos])
+        ]
+    else:
+        return None
+
+
+class Retrospect(_NonTrainableUnivariateTransformer):
+    """Transformer that returns dataframe with retrospective values, i.e. a row
+    at time t includes value at (t-k)'s where k's are specified by user.
+
+    This transformer may be useful for cases where lagging effect should be
+    taken in account. For example, a change of control u may not be reflected
+    in outcome y within 2 minutes, and its effect may last for another 3
+    minutes. In this case, a dataframe where each row include u_[t-3], u_[t-4],
+    u_[t-5], and a series y_t are needed to learn the relationship between
+    control and outcome.
+
+    Parameters
+    ----------
+    n_steps: int, optional
+        Number of retrospective steps to take. Default: 1.
+    step_size: int, optional
+        Length of a retrospective step. Default: 1.
+    till: int, optional
+        Nearest retrospective step. Default: 0, i.e. the current time step.
+
+    Examples
+    --------
+    >>> s = pd.Series(
+            np.arange(10),
+            index=pd.date_range(
+                start='2017-1-1',
+                periods=10,
+                freq='D'))
+            2017-01-01    0
+            2017-01-02    1
+            2017-01-03    2
+            2017-01-04    3
+            2017-01-05    4
+            2017-01-06    5
+            2017-01-07    6
+            2017-01-08    7
+            2017-01-09    8
+            2017-01-10    9
+    >>> Retrospect(n_steps=3, step_size=2, till=1).transform(s)
+                        t-1	t-3	t-5
+            2017-01-01	NaN	NaN	NaN
+            2017-01-02	0.0	NaN	NaN
+            2017-01-03	1.0	NaN	NaN
+            2017-01-04	2.0	0.0	NaN
+            2017-01-05	3.0	1.0	NaN
+            2017-01-06	4.0	2.0	0.0
+            2017-01-07	5.0	3.0	1.0
+            2017-01-08	6.0	4.0	2.0
+            2017-01-09	7.0	5.0	3.0
+            2017-01-10	8.0	6.0	4.0
+
+    """
+
+    def __init__(
+        self, n_steps: int = 1, step_size: int = 1, till: int = 0
+    ) -> None:
+        super().__init__()
+        self.n_steps = n_steps
+        self.step_size = step_size
+        self.till = till
+
+    @property
+    def _param_names(self) -> Tuple[str, ...]:
+        return ("n_steps", "step_size", "till")
+
+    def _predict_core(self, s: pd.Series) -> pd.DataFrame:
+        if not (
+            s.index.is_monotonic_increasing or s.index.is_monotonic_decreasing
+        ):
+            raise ValueError("Time series must have a monotonic time index. ")
+        if (s.index.freq is None) and (s.index.inferred_freq):
+            raise RuntimeError(
+                "Series does not follow any known frequency "
+                "(e.g. second, minute, hour, day, week, month, year, etc."
+            )
+        n_steps = self.n_steps
+        till = self.till
+        step_size = self.step_size
+        df = pd.DataFrame(index=s.index)
+        df = df.assign(
+            **{
+                ("t-{}".format(i)): s.shift(i)
+                for i in range(till, till + n_steps * step_size, step_size)
+            }
+        )
+        return df
