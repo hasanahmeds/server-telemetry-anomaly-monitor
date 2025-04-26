@@ -438,3 +438,227 @@ def _plot_anomaly(
                         ax,
                         anomaly_color,
                         anomaly_alpha,
+                        (
+                            "Anomaly - {}".format(anomaly_name)
+                            if (
+                                (anomaly_label == anomaly_name)
+                                and (anomaly_name in set(df.columns))
+                            )
+                            else anomaly_label
+                        ),
+                    )
+        elif anomaly_tag == "marker":
+            # turn anomaly into binary series, if not yet
+            if isinstance(anomaly, list):
+                anomaly = to_labels(
+                    anomaly, df.index, freq_as_period=freq_as_period
+                )
+            else:
+                try:
+                    pd.testing.assert_index_equal(
+                        anomaly.index, df.index, check_names=False
+                    )
+                except AssertionError:
+                    raise ValueError(
+                        "Series index in argument `anomaly` must be the same "
+                        "as the input time series."
+                    )
+            if match_curve_name and (
+                anomaly_name in set(df.columns)
+            ):  # match found, plot on it
+                for axes_ind in curve2axes[anomaly_name]:
+                    _add_anomaly_series_to_curve(
+                        anomaly,
+                        axes[axes_ind],
+                        df[anomaly_name],
+                        anomaly_color,
+                        anomaly_marker,
+                        anomaly_markersize,
+                        (
+                            anomaly_label
+                            if (anomaly_label != anomaly_name)
+                            else "Anomaly - {}".format(anomaly_name)
+                        ),
+                    )
+            else:  # not match found or don't match, plot on all
+                # hasLegend is an auxilary variable to make sure an anomaly
+                # series only appears once in legend in an axes
+                hasLegend = [False] * len(axes)
+                for curve, axes_inds in curve2axes.items():
+                    for axes_ind in axes_inds:
+                        _add_anomaly_series_to_curve(
+                            anomaly,
+                            axes[axes_ind],
+                            df[curve],
+                            anomaly_color,
+                            anomaly_marker,
+                            anomaly_markersize,
+                            (
+                                "Anomaly - {}".format(anomaly_name)
+                                if (
+                                    (anomaly_label == anomaly_name)
+                                    and (anomaly_name in set(df.columns))
+                                )
+                                else anomaly_label
+                            )
+                            if not hasLegend[axes_ind]
+                            else None,
+                        )
+                        hasLegend[axes_ind] = True
+        else:
+            raise ValueError(
+                "An anomaly tag must be either 'span' or 'marker'."
+            )
+    elif isinstance(anomaly, (pd.DataFrame, dict)):
+        for key in (
+            anomaly.columns
+            if isinstance(anomaly, pd.DataFrame)
+            else anomaly.keys()
+        ):
+            _plot_anomaly(
+                anomaly[key],
+                axes,
+                df,
+                curve2axes,
+                anomaly_tag[key],
+                anomaly_color[key],
+                anomaly_marker[key],
+                anomaly_markersize[key],
+                anomaly_alpha[key],
+                match_curve_name,
+                freq_as_period,
+                color_generator,
+                anomaly_name=key,
+                anomaly_label=(
+                    "{} - {}".format(anomaly_name, key)
+                    if (anomaly_name is not None)
+                    else key
+                ),
+            )
+    else:
+        raise TypeError(
+            "Argument `anomaly` must be a list, pandas Series, DataFrame, or "
+            "a (nested) dict of them."
+        )
+
+
+def _add_anomaly_list_to_axes(
+    anomaly, ax, anomaly_color, anomaly_alpha, anomaly_label
+):
+    "Add a list of anomalous event to an axes as spans"
+    for i, event in enumerate(anomaly):
+        ax.axvspan(
+            xmin=event[0],
+            xmax=event[1],
+            color=anomaly_color,
+            alpha=anomaly_alpha,
+            label=(anomaly_label if i == 0 else None),
+        )
+
+
+def _add_anomaly_series_to_curve(
+    anomaly,
+    ax,
+    s,
+    anomaly_color,
+    anomaly_marker,
+    anomaly_markersize,
+    anomaly_label,
+):
+    "Add anomalies represented by a binary series as markers on a curve"
+    anomaly_curve = s.loc[anomaly == 1]
+    # anomaly_curve.plot(
+    #     ax=ax,
+    #     linewidth=0,
+    #     marker=anomaly_marker,
+    #     markersize=anomaly_markersize,
+    #     color=anomaly_color,
+    #     label=anomaly_label,
+    # )
+    ax.plot_date(
+        anomaly_curve.index,
+        anomaly_curve,
+        fmt="-",
+        linewidth=0,
+        marker=anomaly_marker,
+        markersize=anomaly_markersize,
+        color=anomaly_color,
+        label=anomaly_label,
+    )
+
+
+def _validate_anomaly(anomaly):
+    "Validate argument `anomaly`."
+    if isinstance(anomaly, (list, pd.Series)):
+        pass
+    elif isinstance(anomaly, pd.DataFrame):
+        if anomaly.columns.duplicated().any():
+            raise ValueError(
+                "DataFrame in argument `anomaly` must have unique column names."
+            )
+    elif isinstance(anomaly, dict):
+        for _, value in anomaly.items():
+            _validate_anomaly(value)
+    else:
+        raise TypeError(
+            "Argument `anomaly` must be a list, pandas Series, DataFrame, or "
+            "a (nested) dict of them."
+        )
+
+
+def _assign_properties(prop, anomaly, default=None):
+    "Expand the tree structure of `prop` to that of `anomaly`"
+    if (not isinstance(prop, dict)) and isinstance(
+        anomaly, (dict, pd.DataFrame)
+    ):
+        return {
+            key: _assign_properties(prop, anomaly[key])
+            for key in (
+                anomaly.keys()
+                if isinstance(anomaly, dict)
+                else anomaly.columns
+            )
+        }
+    elif (not isinstance(prop, dict)) and (
+        not isinstance(anomaly, (dict, pd.DataFrame))
+    ):
+        return prop
+    elif isinstance(prop, dict) and (
+        not isinstance(anomaly, (dict, pd.DataFrame))
+    ):
+        raise ValueError("Property dict and anomaly dict are inconsistent.")
+    else:  # isinstance(prop, dict) & isinstance(anomaly, (dict, pd.DataFrame))
+        if set(prop.keys()) <= set(
+            anomaly.keys() if isinstance(anomaly, dict) else anomaly.columns
+        ):
+            return {
+                key: _assign_properties(
+                    (prop[key] if (key in prop.keys()) else default),
+                    anomaly[key],
+                )
+                for key in (
+                    anomaly.keys()
+                    if isinstance(anomaly, dict)
+                    else anomaly.columns
+                )
+            }
+        else:
+            raise ValueError(
+                "Property dict and anomaly dict are inconsistent."
+            )
+
+
+class ColorGenerator:
+    """
+    Generate color
+    """
+
+    def __init__(self):
+        self.latest_auto_color = -1
+
+    def emit(self, color=None):
+        if color is not None:
+            return color
+        else:
+            self.latest_auto_color += 1
+            return "C{}".format(self.latest_auto_color)
