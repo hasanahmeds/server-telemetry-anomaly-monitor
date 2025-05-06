@@ -678,3 +678,19 @@ def test_pipe_summary():
                 "input": "A-C-regression-error",
                 "subset": "all",
             },
+            "ABC-ad": {
+                "model": aggregator.OrAggregator(),
+                "input": ["A-B-regression-ad", "A-C-regression-ad"],
+            },
+            "D-ad": {
+                "model": detector.QuantileAD(high=0.9, low=0.1),
+                "input": "original",
+                "subset": ["D"],
+            },
+            "ABCD-ad": {
+                "model": aggregator.OrAggregator(),
+                "input": ["ABC-ad", "D-ad"],
+            },
+        }
+    )
+    my_pipe.summary()
